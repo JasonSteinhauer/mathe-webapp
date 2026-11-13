@@ -1,0 +1,9 @@
+node_modules/
+dist/
+# Lokale Konfiguration – nie ins Repo
+.env
+.env.*
+!.env.example
+# Supabase CLI (später)
+supabase/.temp/
+supabase/.branches/
