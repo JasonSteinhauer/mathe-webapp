@@ -6,3 +6,11 @@ body { margin:0; background:var(--paper); color:var(--ink); font-family: system-
 .wrap { max-width:760px; margin:0 auto; padding:20px 16px 64px; }
 h1 small { font-weight:400; color:var(--muted); font-size:.95rem; }
 .muted { color:var(--muted); } .small { font-size:.875rem; }
+.card { background: color-mix(in srgb, var(--paper) 80%, white); border:1px solid #d6dde8; border-radius:10px; padding:18px; display:flex; flex-direction:column; gap:12px; margin:16px 0; }
+@media (prefers-color-scheme: dark) { .card { background:#161c27; border-color:#2a3345; } }
+.card h2 { margin:0; font-size:1.15rem; }
+label { font-weight:500; font-size:.92rem; }
+input[type="email"] { width:100%; font:inherit; font-size:16px; padding:10px 12px; border-radius:8px; border:1px solid #d6dde8; background:transparent; color:var(--ink); }
+button { font:inherit; font-weight:500; min-height:44px; padding:10px 14px; border-radius:8px; border:1px solid #d6dde8; background:transparent; color:var(--ink); cursor:pointer; align-self:flex-start; }
+button.primary { background:#2b4fd8; border-color:#2b4fd8; color:#fff; }
+button:disabled { opacity:.55; cursor:default; }
