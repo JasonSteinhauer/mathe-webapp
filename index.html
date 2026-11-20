@@ -3,13 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
     <title>Mathe-Trainer</title>
   </head>
   <body>
     <div class="wrap">
-      <header><h1>Mathe-Trainer <small>Kapitel 1–7</small></h1></header>
-      <main id="app"><p>Lade …</p></main>
-      <footer class="muted small">Dieser Trainer enthält keine Lösungen. Das Feedback kommt von einer KI und kann Fehler enthalten.</footer>
+      <header><h1>Mathe-Trainer <small>Mathe 1 · Kapitel 1–7</small></h1></header>
+      <nav id="nav" class="hidden" aria-label="Bereiche"></nav>
+      <main id="app"><p class="muted">Lade …</p></main>
+      <footer class="foot">
+        <span>Enthält keine Lösungen. Das Feedback kommt von einer KI und kann Fehler enthalten.</span>
+        <a href="#datenschutz">Datenschutz</a>
+      </footer>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

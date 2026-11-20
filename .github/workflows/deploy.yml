@@ -18,8 +18,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -29,6 +29,8 @@ jobs:
           # Öffentliche Werte aus Repo → Settings → Secrets and variables → Actions → Variables
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_VERANTWORTLICH_NAME: ${{ vars.VITE_VERANTWORTLICH_NAME }}
+          VITE_VERANTWORTLICH_KONTAKT: ${{ vars.VITE_VERANTWORTLICH_KONTAKT }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

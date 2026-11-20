@@ -1,115 +1,130 @@
 import "./style.css";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, supabaseKonfiguriert } from "./supabase";
+import { el } from "./ui";
+import { ladeAlles, zustand } from "./daten";
+import { renderWander, renderErklaer, renderKarten } from "./uebung";
+import { renderFortschritt } from "./fortschritt";
+import { renderStart, renderKonto, renderAdmin, renderDatenschutz } from "./seiten";
 
-// Stage 3: Login per E-Mail-Link (nur Eingeladene). Trainer-Funktionen folgen in Stage 5.
 const app = document.getElementById("app")!;
+const nav = document.getElementById("nav")!;
 
-function el<K extends keyof HTMLElementTagNameMap>(
-  tag: K,
-  props: Partial<HTMLElementTagNameMap[K]> = {},
-  ...kinder: (Node | string)[]
-): HTMLElementTagNameMap[K] {
-  const n = Object.assign(document.createElement(tag), props);
-  n.append(...kinder);
-  return n;
-}
-
-function zeigeHinweis(text: string): void {
-  app.replaceChildren(el("p", { textContent: text }));
-}
-
+/* ---------------- Login: Code oder Link per E-Mail ---------------- */
 function zeigeLogin(): void {
+  nav.replaceChildren();
+  nav.classList.add("hidden");
+  if (location.hash === "#datenschutz") { renderDatenschutz(app); return; }
   const eingabe = el("input", { type: "email", id: "email", required: true, autocomplete: "email", placeholder: "name@beispiel.de" });
-  const knopf = el("button", { type: "submit", className: "primary", textContent: "Login-Code senden" });
-  const status = el("p", { className: "muted small" });
-  const form = el("form", { className: "card" },
-    el("h2", { textContent: "Anmelden" }),
-    el("p", { className: "muted", textContent: "Der Trainer ist nur für eingeladene Personen. Du bekommst eine E-Mail mit einem Code und einem Link, ein Passwort gibt es nicht." }),
-    el("label", { htmlFor: "email", textContent: "E-Mail-Adresse" }),
-    eingabe, knopf, status
-  );
+  const knopf = el("button", { type: "submit", class: "primary" }, "Login-Code senden");
+  const status = el("p", { class: "muted small" });
+  const form = el("form", { class: "card" },
+    el("h2", null, "Anmelden"),
+    el("p", { class: "muted", style: "margin:0" }, "Der Mathe-Trainer ist nur für eingeladene Personen. Du bekommst eine E-Mail mit einem Code und einem Link, ein Passwort gibt es nicht."),
+    el("label", { for: "email" }, "E-Mail-Adresse"), eingabe, el("div", { class: "row" }, knopf), status);
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!supabase) return;
     const email = eingabe.value.trim();
-    knopf.disabled = true;
-    status.textContent = "Sende …";
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: false, emailRedirectTo: window.location.origin }
-    });
+    knopf.disabled = true; status.textContent = "Sende …";
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false, emailRedirectTo: window.location.origin } });
     if (error) console.warn("Login-Fehler", error.status, error.message);
     knopf.disabled = false;
-    if (error && error.status === 429) {
-      status.textContent = "Zu viele Versuche. Warte ein paar Minuten.";
-    } else if (error && error.status !== 400 && error.status !== 422) {
-      status.textContent = "Der Login-Dienst ist gerade nicht erreichbar oder falsch eingerichtet (Fehler " + (error.status ?? "Netzwerk") + ").";
-    } else {
-      // 400/422 = Adresse nicht eingeladen → bewusst derselbe Ablauf wie bei Erfolg,
-      // damit niemand ausprobieren kann, wer eingeladen ist.
-      zeigeCodeEingabe(email);
-    }
+    if (error && error.status === 429) status.textContent = "Zu viele Versuche. Warte ein paar Minuten.";
+    else if (error && error.status !== 400 && error.status !== 422) status.textContent = "Der Login-Dienst ist gerade nicht erreichbar oder falsch eingerichtet (Fehler " + (error.status ?? "Netzwerk") + ").";
+    else zeigeCodeEingabe(email); // 400/422 = nicht eingeladen → bewusst derselbe Ablauf
   });
-  app.replaceChildren(form);
+  app.replaceChildren(form, el("section", { class: "card" },
+    el("h2", null, "Was ist das?"),
+    el("p", { style: "margin:0" }, "Ein Übungstrainer für Mathe 1 (Kapitel 1–7): Fragen in eigenen Worten beantworten, Tipps von einem KI-Prüfer bekommen, Begriffe mit Lernkarten wiederholen. Ohne fertige Lösungen.")));
 }
 
 function zeigeCodeEingabe(email: string): void {
-  const code = el("input", {
-    type: "text", id: "code", required: true, inputMode: "numeric", autocomplete: "one-time-code",
-    pattern: "[0-9]{6,10}", maxLength: 10, placeholder: "123456"
-  });
-  const knopf = el("button", { type: "submit", className: "primary", textContent: "Anmelden" });
-  const zurueck = el("button", { type: "button", textContent: "Andere Adresse" });
-  const status = el("p", { className: "muted small" });
-  const form = el("form", { className: "card" },
-    el("h2", { textContent: "Code eingeben" }),
-    el("p", { className: "muted", textContent: "Wenn " + email + " eingeladen ist, kommt gleich eine E-Mail. Gib den Code hier ein – oder klick in der Mail auf „Jetzt anmelden“." }),
-    el("label", { htmlFor: "code", textContent: "Code aus der E-Mail" }),
-    code,
-    el("div", { className: "row" }, knopf, zurueck),
-    status
-  );
+  const code = el("input", { type: "text", class: "code", id: "code", required: true, inputmode: "numeric", autocomplete: "one-time-code", pattern: "[0-9]{6,10}", maxlength: 10, placeholder: "123456" });
+  const knopf = el("button", { type: "submit", class: "primary" }, "Anmelden");
+  const zurueck = el("button", { type: "button" }, "Andere Adresse");
+  const status = el("p", { class: "muted small" });
+  const form = el("form", { class: "card" },
+    el("h2", null, "Code eingeben"),
+    el("p", { class: "muted", style: "margin:0" }, "Wenn " + email + " eingeladen ist, kommt gleich eine E-Mail. Gib den Code hier ein, oder klick in der Mail auf „Jetzt anmelden“."),
+    el("label", { for: "code" }, "Code aus der E-Mail"), code, el("div", { class: "row" }, knopf, zurueck), status);
   zurueck.addEventListener("click", zeigeLogin);
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!supabase) return;
-    knopf.disabled = true;
-    status.textContent = "Prüfe …";
+    knopf.disabled = true; status.textContent = "Prüfe …";
     const { error } = await supabase.auth.verifyOtp({ email, token: code.value.replace(/\s/g, ""), type: "email" });
     knopf.disabled = false;
     if (error) {
       console.warn("Code-Fehler", error.status, error.message);
-      status.textContent = error.status === 429
-        ? "Zu viele Versuche. Warte ein paar Minuten."
-        : "Der Code stimmt nicht oder ist abgelaufen. Prüf ihn oder fordere einen neuen an.";
+      status.textContent = error.status === 429 ? "Zu viele Versuche. Warte ein paar Minuten." : "Der Code stimmt nicht oder ist abgelaufen. Prüf ihn oder fordere einen neuen an.";
     }
-    // Bei Erfolg schaltet onAuthStateChange automatisch auf „Angemeldet“ um.
   });
   app.replaceChildren(form);
   code.focus();
 }
 
-function zeigeAngemeldet(session: Session): void {
-  const raus = el("button", { type: "button", textContent: "Abmelden" });
-  raus.addEventListener("click", () => { void supabase?.auth.signOut(); });
-  app.replaceChildren(el("section", { className: "card" },
-    el("h2", { textContent: "Angemeldet" }),
-    el("p", { textContent: "Du bist angemeldet als " + (session.user.email ?? "unbekannt") + ". Der Trainer kommt in Stage 5." }),
-    raus
-  ));
+/* ---------------- Angemeldet: Navigation + Ansichten ---------------- */
+let session: Session | null = null;
+let ladeVersuch: Promise<void> | null = null;
+
+const ANSICHTEN: Record<string, { titel: string; render: (v: HTMLElement) => void | Promise<void>; nav?: boolean; admin?: boolean }> = {
+  start: { titel: "Start", render: renderStart, nav: true },
+  wander: { titel: "Wanderfragen", render: renderWander, nav: true },
+  erklaer: { titel: "Erklär's mir", render: renderErklaer, nav: true },
+  karten: { titel: "Karten", render: renderKarten, nav: true },
+  fortschritt: { titel: "Fortschritt", render: renderFortschritt, nav: true },
+  konto: { titel: "Konto", render: (v) => renderKonto(v, session?.user.email ?? ""), nav: true },
+  admin: { titel: "Admin", render: renderAdmin, nav: true, admin: true },
+  datenschutz: { titel: "Datenschutz", render: renderDatenschutz },
+};
+
+function aktuelleAnsicht(): string {
+  const h = location.hash.replace("#", "");
+  const a = ANSICHTEN[h];
+  return a && (!a.admin || zustand.istAdmin) ? h : "start";
 }
 
-async function start(): Promise<void> {
+function zeichneNav(): void {
+  const eintraege = Object.entries(ANSICHTEN).filter(([, a]) => a.nav && (!a.admin || zustand.istAdmin));
+  nav.style.setProperty("--nav-n", String(eintraege.length));
+  nav.replaceChildren(...eintraege.map(([k, a]) => el("a", { href: "#" + k, "data-view": k }, a.titel)));
+  nav.classList.remove("hidden");
+}
+
+async function route(): Promise<void> {
+  if (!session) { zeigeLogin(); return; }
+  if (!zustand.geladen) {
+    app.replaceChildren(el("p", { class: "muted" }, "Lade deine Daten …"));
+    try { await (ladeVersuch ??= ladeAlles()); }
+    catch (e) {
+      console.error(e); ladeVersuch = null;
+      app.replaceChildren(el("div", { class: "notice warn" }, "Die Daten konnten nicht geladen werden. Prüf deine Verbindung und lade die Seite neu."));
+      return;
+    }
+    zeichneNav();
+  }
+  const v = aktuelleAnsicht();
+  nav.querySelectorAll("a").forEach((a) => a.setAttribute("aria-current", a.dataset.view === v ? "page" : "false"));
+  await ANSICHTEN[v].render(app);
+}
+
+function start(): void {
   if (!supabaseKonfiguriert || !supabase) {
-    zeigeHinweis("Gerüst läuft. Supabase ist noch nicht konfiguriert (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY fehlen).");
+    app.replaceChildren(el("p", null, "Supabase ist noch nicht konfiguriert (VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY fehlen)."));
     return;
   }
-  supabase.auth.onAuthStateChange((_ereignis, session) => {
-    if (session) zeigeAngemeldet(session); else zeigeLogin();
+  window.addEventListener("hashchange", () => void route());
+  supabase.auth.onAuthStateChange((ereignis, s) => {
+    const vorher = session?.user.id;
+    session = s;
+    if (ereignis === "SIGNED_OUT" || (s && s.user.id !== vorher)) { zustand.geladen = false; ladeVersuch = null; }
+    // Nur bei echten Wechseln neu zeichnen (nicht bei jedem Token-Refresh)
+    if (ereignis === "INITIAL_SESSION" || ereignis === "SIGNED_IN" || ereignis === "SIGNED_OUT") {
+      if (ereignis === "SIGNED_IN" && vorher === s?.user.id) return;
+      setTimeout(() => void route(), 0);
+    }
   });
-  const { data } = await supabase.auth.getSession();
-  if (data.session) zeigeAngemeldet(data.session); else zeigeLogin();
 }
 
-void start();
+start();
