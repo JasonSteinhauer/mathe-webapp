@@ -14,3 +14,5 @@ input[type="email"] { width:100%; font:inherit; font-size:16px; padding:10px 12p
 button { font:inherit; font-weight:500; min-height:44px; padding:10px 14px; border-radius:8px; border:1px solid #d6dde8; background:transparent; color:var(--ink); cursor:pointer; align-self:flex-start; }
 button.primary { background:#2b4fd8; border-color:#2b4fd8; color:#fff; }
 button:disabled { opacity:.55; cursor:default; }
+input[type="text"] { width:100%; font:inherit; font-size:20px; letter-spacing:.2em; padding:10px 12px; border-radius:8px; border:1px solid #d6dde8; background:transparent; color:var(--ink); }
+.row { display:flex; gap:8px; flex-wrap:wrap; }

@@ -21,35 +21,73 @@ function zeigeHinweis(text: string): void {
 
 function zeigeLogin(): void {
   const eingabe = el("input", { type: "email", id: "email", required: true, autocomplete: "email", placeholder: "name@beispiel.de" });
-  const knopf = el("button", { type: "submit", className: "primary", textContent: "Login-Link senden" });
+  const knopf = el("button", { type: "submit", className: "primary", textContent: "Login-Code senden" });
   const status = el("p", { className: "muted small" });
   const form = el("form", { className: "card" },
     el("h2", { textContent: "Anmelden" }),
-    el("p", { className: "muted", textContent: "Der Trainer ist nur für eingeladene Personen. Du bekommst einen Link per E-Mail, ein Passwort gibt es nicht." }),
+    el("p", { className: "muted", textContent: "Der Trainer ist nur für eingeladene Personen. Du bekommst eine E-Mail mit einem Code und einem Link, ein Passwort gibt es nicht." }),
     el("label", { htmlFor: "email", textContent: "E-Mail-Adresse" }),
     eingabe, knopf, status
   );
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     if (!supabase) return;
+    const email = eingabe.value.trim();
     knopf.disabled = true;
     status.textContent = "Sende …";
     const { error } = await supabase.auth.signInWithOtp({
-      email: eingabe.value.trim(),
+      email,
       options: { shouldCreateUser: false, emailRedirectTo: window.location.origin }
     });
-    // Gleiche Meldung für eingeladene und nicht eingeladene Adressen,
-    // damit niemand ausprobieren kann, wer eingeladen ist.
-    if (error && error.status && error.status >= 500) {
-      status.textContent = "Der Login-Dienst ist gerade nicht erreichbar. Versuch es später noch einmal.";
-    } else if (error && error.status === 429) {
-      status.textContent = "Zu viele Versuche. Warte ein paar Minuten.";
-    } else {
-      status.textContent = "Wenn diese Adresse eingeladen ist, kommt gleich eine E-Mail mit dem Login-Link.";
-    }
+    if (error) console.warn("Login-Fehler", error.status, error.message);
     knopf.disabled = false;
+    if (error && error.status === 429) {
+      status.textContent = "Zu viele Versuche. Warte ein paar Minuten.";
+    } else if (error && error.status !== 400 && error.status !== 422) {
+      status.textContent = "Der Login-Dienst ist gerade nicht erreichbar oder falsch eingerichtet (Fehler " + (error.status ?? "Netzwerk") + ").";
+    } else {
+      // 400/422 = Adresse nicht eingeladen → bewusst derselbe Ablauf wie bei Erfolg,
+      // damit niemand ausprobieren kann, wer eingeladen ist.
+      zeigeCodeEingabe(email);
+    }
   });
   app.replaceChildren(form);
+}
+
+function zeigeCodeEingabe(email: string): void {
+  const code = el("input", {
+    type: "text", id: "code", required: true, inputMode: "numeric", autocomplete: "one-time-code",
+    pattern: "[0-9]{6,10}", maxLength: 10, placeholder: "123456"
+  });
+  const knopf = el("button", { type: "submit", className: "primary", textContent: "Anmelden" });
+  const zurueck = el("button", { type: "button", textContent: "Andere Adresse" });
+  const status = el("p", { className: "muted small" });
+  const form = el("form", { className: "card" },
+    el("h2", { textContent: "Code eingeben" }),
+    el("p", { className: "muted", textContent: "Wenn " + email + " eingeladen ist, kommt gleich eine E-Mail. Gib den Code hier ein – oder klick in der Mail auf „Jetzt anmelden“." }),
+    el("label", { htmlFor: "code", textContent: "Code aus der E-Mail" }),
+    code,
+    el("div", { className: "row" }, knopf, zurueck),
+    status
+  );
+  zurueck.addEventListener("click", zeigeLogin);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!supabase) return;
+    knopf.disabled = true;
+    status.textContent = "Prüfe …";
+    const { error } = await supabase.auth.verifyOtp({ email, token: code.value.replace(/\s/g, ""), type: "email" });
+    knopf.disabled = false;
+    if (error) {
+      console.warn("Code-Fehler", error.status, error.message);
+      status.textContent = error.status === 429
+        ? "Zu viele Versuche. Warte ein paar Minuten."
+        : "Der Code stimmt nicht oder ist abgelaufen. Prüf ihn oder fordere einen neuen an.";
+    }
+    // Bei Erfolg schaltet onAuthStateChange automatisch auf „Angemeldet“ um.
+  });
+  app.replaceChildren(form);
+  code.focus();
 }
 
 function zeigeAngemeldet(session: Session): void {
