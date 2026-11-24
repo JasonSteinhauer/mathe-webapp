@@ -1,6 +1,8 @@
 // Fortschritt: eigene Auswertung (nur die eigenen Daten, per RLS geschützt)
 import { el, kapLabel, fmtDate, dayKey, KAPITEL, KAT_LABEL, FEHLERTYPEN, DAY } from "./ui";
 import { zustand, LIMIT_PRO_TAG, type Antwort } from "./daten";
+import { berechneStand, kapitelSicherheit } from "./lernstand";
+import { oeffneChatZuAntwort } from "./verstehen";
 
 const KATS = ["richtig", "teilweise", "fehler", "offen"] as const;
 
@@ -57,6 +59,18 @@ export function renderFortschritt(view: HTMLElement): void {
       el("div", { class: "row" }, el("a", { href: "#wander" }, "Zur Wanderfrage-Runde"))));
     view.replaceChildren(sec); return;
   }
+  const stand = berechneStand();
+  const sicher = kapitelSicherheit(stand);
+  const lernBars = el("div", { class: "bars" });
+  for (const v of KAPITEL) {
+    const k = sicher[v];
+    lernBars.append(el("div", { class: "bar" }, el("span", { class: "lbl" }, "Kap. " + v),
+      el("div", { class: "stack", role: "img", "aria-label": "Kapitel " + v + ": " + k.prozent + " Prozent sicher" }, el("i", { class: "s-richtig", style: "width:" + k.prozent + "%" })),
+      el("span", { class: "num" }, k.prozent + " %")));
+  }
+  const offenAnzahl = Object.values(stand).filter((x) => x.faellig <= Date.now()).length;
+  sec.append(el("section", { class: "card" }, el("h2", null, "Lernstand pro Kapitel"), lernBars,
+    el("p", { class: "muted small", style: "margin:0" }, `Grundlage: Stufe 0–5 pro Frage (richtig hebt an, teilweise senkt, Fehler oder angesehene Lösung setzt zurück). „Verstanden“ = zweimal in Folge richtig mit Abstand. Gerade zur Wiederholung fällig: ${offenAnzahl} Fragen.`)));
   const perKap = el("div", { class: "bars" });
   for (const v of KAPITEL) {
     const c: Record<string, number> = {}; let t = 0;
@@ -77,11 +91,12 @@ export function renderFortschritt(view: HTMLElement): void {
   Object.values(zustand.karten).forEach((c) => { if (c.stufe >= 1 && c.stufe <= 5) stufen[c.stufe - 1]++; });
   const kb = el("div", { class: "bars" }); const maxS = Math.max(1, ...stufen);
   stufen.forEach((n, i) => kb.append(el("div", { class: "bar" }, el("span", { class: "lbl" }, "Stufe " + (i + 1)), el("div", { class: "stack" }, el("i", { style: "background:var(--accent);width:" + (n / maxS) * 100 + "%" })), el("span", { class: "num" }, n))));
-  sec.append(el("section", { class: "card" }, el("h2", null, "Glossar-Karten"), el("p", { class: "muted small", style: "margin:0" }, Object.keys(zustand.karten).length + " von " + zustand.begriffe.length + " Begriffen im Kasten"), kb));
+  sec.append(el("section", { class: "card" }, el("h2", null, "Begriffe"), el("p", { class: "muted small", style: "margin:0" }, Object.keys(zustand.karten).length + " von " + zustand.begriffe.length + " Begriffen im Verständnis-Chat besprochen und eingeschätzt"), kb));
   const list = el("div", { class: "list" });
   a.slice(-10).reverse().forEach((x) => list.append(el("div", null,
     el("div", { class: "row" }, el("span", { class: "pill " + x.kategorie }, KAT_LABEL[x.kategorie] || x.kategorie), el("span", { class: "tag" }, kapLabel(x.kapitel)), el("span", { class: "muted small" }, fmtDate(x.ts)), x.zu_viel_verraten ? el("span", { class: "trap" }, "zu viel verraten") : null),
-    el("span", { class: "small" }, x.frage))));
+    el("span", { class: "small" }, x.frage),
+    x.modus === "wander" && x.kategorie !== "richtig" ? el("div", { class: "row" }, el("button", { type: "button", class: "small", onclick: () => oeffneChatZuAntwort(x) }, "Im Chat verstehen")) : null)));
   sec.append(el("section", { class: "card" }, el("h2", null, "Letzte Antworten"), list));
   view.replaceChildren(sec);
 }

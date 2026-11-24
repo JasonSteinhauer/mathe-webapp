@@ -3,4 +3,4 @@
 // Solange sie fehlen, zeigt die Datenschutzseite einen deutlichen Hinweis.
 export const VERANTWORTLICH_NAME = (import.meta.env.VITE_VERANTWORTLICH_NAME as string | undefined)?.trim() || "";
 export const VERANTWORTLICH_KONTAKT = (import.meta.env.VITE_VERANTWORTLICH_KONTAKT as string | undefined)?.trim() || "";
-export const STAND_DATENSCHUTZ = "20.11.2026";
+export const STAND_DATENSCHUTZ = "24.11.2026";

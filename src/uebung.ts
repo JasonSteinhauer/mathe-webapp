@@ -1,6 +1,8 @@
 // Übungsansichten: Wanderfragen, Erklär's mir, Glossar-Karten (Leitner)
-import { el, shuffle, slugify, kapLabel, KAPITEL, KAT_LABEL, DAY } from "./ui";
-import { zustand, speichereKarte, type Antwort, type NeueAntwort, type Frage, type Begriff, type Karte } from "./daten";
+import { el, slugify, kapLabel, KAPITEL, KAT_LABEL } from "./ui";
+import { zustand, type Antwort, type NeueAntwort, type Frage, type Begriff } from "./daten";
+import { waehleRunde, kapitelSicherheit } from "./lernstand";
+import { oeffneChatZuAntwort } from "./verstehen";
 import { qaFlow } from "./qa";
 
 type Rec = Antwort | NeueAntwort;
@@ -14,44 +16,25 @@ function letzteProFrage(): Record<string, Antwort> {
 /* ---------------- Wanderfragen ---------------- */
 let runde: { id: string; fragen: Frage[]; i: number; ergebnisse: Rec[] } | null = null;
 
-function waehleRunde(kap: Set<number>, n: number): Frage[] {
-  const last = letzteProFrage();
-  const pool = zustand.fragen.filter((q) => q.kapitel.some((v) => kap.has(v))).map((q) => {
-    const l = last[q.id]; let s = Math.random();
-    if (!l) s += 0.6; else if (l.kategorie === "fehler") s += 0.9; else if (l.kategorie === "teilweise" || l.kategorie === "offen") s += 0.5;
-    else if (Date.now() - l.ts < 3 * DAY) s -= 0.4;
-    return { q, s };
-  }).sort((a, b) => b.s - a.s);
-  const proKap: Record<number, number> = {}, proF: Record<string, number> = {};
-  const maxKap = Math.max(2, Math.ceil(n / kap.size) + 1), maxF = 4, pick: Frage[] = [];
-  for (const { q } of pool) {
-    if (pick.length >= n) break;
-    const v = q.kapitel[0];
-    if ((proKap[v] || 0) >= maxKap || (proF[q.format] || 0) >= maxF) continue;
-    pick.push(q); proKap[v] = (proKap[v] || 0) + 1; proF[q.format] = (proF[q.format] || 0) + 1;
-  }
-  for (const { q } of pool) { if (pick.length >= n) break; if (!pick.includes(q)) pick.push(q); }
-  return shuffle(pick);
-}
-
 export function renderWander(view: HTMLElement): void {
   if (runde && runde.i < runde.fragen.length) return renderWanderFrage(view);
   if (runde) return renderWanderEnde(view);
   const sel = new Set(KAPITEL);
+  const sicher = kapitelSicherheit();
   const picks = el("div", { class: "vlpick", role: "group", "aria-label": "Kapitel" });
   const start = el("button", { type: "button", class: "primary" }, "Runde starten (10 Fragen)");
   for (const v of KAPITEL) {
     const id = "kap-" + v;
     const cb = el("input", { type: "checkbox", id, checked: true });
     cb.addEventListener("change", () => { if (cb.checked) sel.add(v); else sel.delete(v); start.disabled = sel.size === 0; });
-    picks.append(el("label", { for: id }, cb, "Kap. " + v));
+    picks.append(el("label", { for: id, title: "Sicherheit in diesem Kapitel" }, cb, "Kap. " + v, el("span", { class: "muted small" }, " " + sicher[v].prozent + " %")));
   }
   start.addEventListener("click", () => { runde = { id: "r-" + Date.now(), fragen: waehleRunde(sel, 10), i: 0, ergebnisse: [] }; renderWander(view); });
   const last = letzteProFrage();
   const offen = zustand.fragen.filter((q) => last[q.id] && last[q.id].kategorie !== "richtig").length;
   view.replaceChildren(el("section", { class: "card" },
     el("h2", null, "Wanderfrage-Runde"),
-    el("p", { class: "muted", style: "margin:0" }, "10 gemischte Fragen aus den gewählten Kapiteln. Nach jeder Antwort gibt der Prüfer einen Tipp und stellt eine Nachfrage. Fragen, die zuletzt falsch oder nur teilweise richtig waren, kommen öfter dran."),
+    el("p", { class: "muted", style: "margin:0" }, "10 Fragen, angepasst an deinen Lernstand: Schwache Kapitel und Fragen, die noch nicht sitzen, kommen öfter, bis du sie zweimal mit Abstand richtig hattest. Sichere Themen kommen seltener, dafür mit anspruchsvolleren Nachfragen. Die Prozentzahl zeigt, wie sicher du im Kapitel bist."),
     el("div", { class: "row small muted" }, el("span", null, zustand.fragen.length + " Fragen im Pool"), el("span", null, "·"), el("span", null, offen + " noch nicht sicher")),
     el("div", null, el("h3", { style: "margin-bottom:8px" }, "Kapitel"), picks),
     el("div", { class: "row" }, start)));
@@ -77,7 +60,8 @@ function renderWanderEnde(view: HTMLElement): void {
   e.forEach((r, i) => list.append(el("div", null,
     el("div", { class: "row" }, el("span", { class: "pill " + r.kategorie }, KAT_LABEL[r.kategorie]), el("span", { class: "tag" }, kapLabel(r.kapitel)),
       r.kategorie_nachfrage ? el("span", { class: "muted small" }, "Nachfrage: " + KAT_LABEL[r.kategorie_nachfrage]) : null),
-    el("span", { class: "small" }, i + 1 + ". " + r.frage))));
+    el("span", { class: "small" }, i + 1 + ". " + r.frage),
+    "id" in r && r.kategorie !== "richtig" ? el("div", { class: "row" }, el("button", { type: "button", class: "small", onclick: () => oeffneChatZuAntwort(r as Antwort) }, "Im Chat verstehen")) : null)));
   const neu = el("button", { type: "button", class: "primary" }, "Neue Runde");
   neu.addEventListener("click", () => { runde = null; renderWander(view); });
   view.replaceChildren(el("section", { class: "card" },
@@ -138,56 +122,3 @@ function renderErklaerFrage(view: HTMLElement): void {
     () => { erklaerBegriff = null; renderErklaer(view); window.scrollTo({ top: 0 }); }));
 }
 
-/* ---------------- Glossar-Karten (Leitner: 1/2/4/8/16 Tage) ---------------- */
-const INTERVALLE = [1, 2, 4, 8, 16];
-let kartenQueue: Begriff[] | null = null, kartenIdx = 0;
-
-export function naechsteStufe(alt: number, bewertung: "sicher" | "unsicher" | "keine"): number {
-  if (bewertung === "sicher") return Math.min(5, alt ? alt + 1 : 1);
-  if (bewertung === "unsicher") return Math.max(1, alt);
-  return 1;
-}
-
-export function renderKarten(view: HTMLElement): void {
-  const now = Date.now();
-  const due = zustand.begriffe.filter((g) => zustand.karten[g.id] && zustand.karten[g.id].faellig <= now).sort((a, b) => zustand.karten[a.id].stufe - zustand.karten[b.id].stufe);
-  const neu = zustand.begriffe.filter((g) => !zustand.karten[g.id]);
-  if (!kartenQueue || kartenIdx >= kartenQueue.length) {
-    const stufen = [0, 0, 0, 0, 0];
-    Object.values(zustand.karten).forEach((c) => { if (c.stufe >= 1 && c.stufe <= 5) stufen[c.stufe - 1]++; });
-    const start = el("button", { type: "button", class: "primary" }, due.length ? "Fällige Karten lernen (" + Math.min(due.length + Math.min(neu.length, 10), 30) + ")" : neu.length ? "Neue Karten lernen (10)" : "Alles erledigt");
-    start.disabled = !due.length && !neu.length;
-    start.addEventListener("click", () => { kartenQueue = due.concat(shuffle(neu.slice()).slice(0, 10)).slice(0, 30); kartenIdx = 0; renderKarten(view); });
-    view.replaceChildren(el("section", { class: "card" },
-      el("h2", null, "Glossar-Karten"),
-      el("p", { class: "muted", style: "margin:0" }, "Auf der Karte steht nur der Begriff. Erkläre ihn dir selbst und schätze dich dann ehrlich ein. „Sicher“ schiebt die Karte eine Stufe weiter (1, 2, 4, 8, 16 Tage), „keine Ahnung“ setzt sie auf Stufe 1 zurück."),
-      el("div", { class: "tiles" },
-        el("div", { class: "tile" }, el("b", null, due.length), el("span", null, "heute fällig")),
-        el("div", { class: "tile" }, el("b", null, neu.length), el("span", null, "noch nie gelernt")),
-        el("div", { class: "tile" }, el("b", null, Object.keys(zustand.karten).length), el("span", null, "im Kasten")),
-        el("div", { class: "tile" }, el("b", null, stufen[4]), el("span", null, "auf Stufe 5"))),
-      el("div", { class: "row" }, start)));
-    return;
-  }
-  const g = kartenQueue[kartenIdx];
-  const c = zustand.karten[g.id];
-  const rate = (bew: "sicher" | "unsicher" | "keine") => async () => {
-    const stufe = naechsteStufe(c ? c.stufe : 0, bew);
-    const t = Date.now();
-    const verlauf = (c?.verlauf ?? []).slice(-29).concat([{ ts: t, bewertung: bew }]);
-    const k: Karte = { karte_id: g.id, begriff: g.begriff, kapitel: g.kapitel, stufe, faellig: t + INTERVALLE[stufe - 1] * DAY, letzte: t, verlauf };
-    await speichereKarte(k);
-    kartenIdx++; renderKarten(view);
-  };
-  const ta = el("textarea", { class: "short", id: "k-" + g.id, placeholder: "Optional: Schreib deine Erklärung. Sie wird nicht gespeichert und nicht bewertet." });
-  view.replaceChildren(el("section", { class: "card" },
-    el("div", { class: "row between" }, el("div", { class: "tags" }, el("span", { class: "tag" }, "Kap. " + g.kapitel), el("span", { class: "tag plain" }, c ? "Stufe " + c.stufe : "neu")), el("span", { class: "muted small" }, "Karte " + (kartenIdx + 1) + " von " + kartenQueue.length)),
-    el("p", { class: "term" }, g.begriff),
-    el("label", { for: "k-" + g.id }, "Deine Erklärung"), ta,
-    el("div", { class: "row" }, el("a", { href: "#erklaer", onclick: () => setzeErklaerBegriff(g) }, "Mit dem Prüfer üben")),
-    el("h3", null, "Wie sicher warst du?"),
-    el("div", { class: "row" },
-      el("button", { type: "button", class: "primary", onclick: rate("sicher") }, "Sicher"),
-      el("button", { type: "button", onclick: rate("unsicher") }, "Unsicher"),
-      el("button", { type: "button", onclick: rate("keine") }, "Keine Ahnung"))));
-}

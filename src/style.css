@@ -124,3 +124,10 @@ input.code{font-size:22px !important;letter-spacing:.25em;font-family:var(--f-mo
 .prose p,.prose li{max-width:65ch}
 .prose h3{text-transform:none;letter-spacing:0;color:var(--ink);font-size:1rem;margin-top:8px}
 @media (max-width:520px){nav{grid-template-columns:repeat(3,1fr)}}
+
+/* Verständnis-Chat */
+.chat{display:flex;flex-direction:column;gap:8px}
+.msg{max-width:92%;border-radius:10px;padding:10px 12px;border:1px solid var(--line)}
+.msg.user{align-self:flex-end;background:var(--accent-soft)}
+.msg.assistant{align-self:flex-start;background:var(--paper)}
+.msg-text{white-space:pre-wrap;line-height:1.5}

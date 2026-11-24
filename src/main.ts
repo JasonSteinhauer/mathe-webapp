@@ -3,7 +3,8 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase, supabaseKonfiguriert } from "./supabase";
 import { el } from "./ui";
 import { ladeAlles, zustand } from "./daten";
-import { renderWander, renderErklaer, renderKarten } from "./uebung";
+import { renderWander, renderErklaer } from "./uebung";
+import { renderVerstehen } from "./verstehen";
 import { renderFortschritt } from "./fortschritt";
 import { renderStart, renderKonto, renderAdmin, renderDatenschutz } from "./seiten";
 
@@ -72,7 +73,7 @@ const ANSICHTEN: Record<string, { titel: string; render: (v: HTMLElement) => voi
   start: { titel: "Start", render: renderStart, nav: true },
   wander: { titel: "Wanderfragen", render: renderWander, nav: true },
   erklaer: { titel: "Erklär's mir", render: renderErklaer, nav: true },
-  karten: { titel: "Karten", render: renderKarten, nav: true },
+  verstehen: { titel: "Verstehen", render: renderVerstehen, nav: true },
   fortschritt: { titel: "Fortschritt", render: renderFortschritt, nav: true },
   konto: { titel: "Konto", render: (v) => renderKonto(v, session?.user.email ?? ""), nav: true },
   admin: { titel: "Admin", render: renderAdmin, nav: true, admin: true },

@@ -1,5 +1,6 @@
 // Frage-Antwort-Ablauf (gemeinsam für Wanderfragen und Erklär's mir)
 import { el, toast, symbolBar, kapLabel, FORMATE, FEHLERTYPEN, KAT_LABEL } from "./ui";
+import { niveauFuer } from "./lernstand";
 import { pruefe, speichereAntwort, aktualisiereAntwort, meldeFrage, LIMIT_PRO_TAG, zustand, type Antwort, type Feedback, type NeueAntwort } from "./daten";
 
 export type QaKontext = {
@@ -76,13 +77,14 @@ export function qaFlow(ctx: QaKontext, onDone: (rec: Antwort | NeueAntwort) => v
   async function abgabe(text: string) {
     send.disabled = idk.disabled = true; ta.readOnly = true;
     out.classList.remove("hidden");
-    out.replaceChildren(el("p", { class: "muted" }, "Der Prüfer liest deine Antwort …"));
+    out.replaceChildren(el("p", { class: "muted" }, "Der Prüfer liest deine Antwort gründlich … (ca. 10–20 Sekunden)"));
     rec = {
       modus: ctx.modus, runde_id: ctx.rundeId ?? null, frage_id: ctx.frageId, kapitel: ctx.kapitel, format: ctx.format,
       frage: ctx.frage, antwort: text, weiss_nicht: !text, kategorie: "offen", fehlertypen: [], tipp: "", nachfrage: "",
       antwort_nachfrage: "", kategorie_nachfrage: "", fehlertypen_nachfrage: [], tipp_nachfrage: "", zu_viel_verraten: false, quelle: "offline",
     };
-    const r = await pruefe({ modus: ctx.modus, frageId: ctx.modus === "wander" ? ctx.frageId : undefined, begriffId: ctx.begriffId, freiesThema: ctx.freiesThema, antwort: text, phase: 1 });
+    const r = await pruefe({ modus: ctx.modus, frageId: ctx.modus === "wander" ? ctx.frageId : undefined, begriffId: ctx.begriffId, freiesThema: ctx.freiesThema, antwort: text, phase: 1,
+      niveau: ctx.modus === "wander" ? niveauFuer(ctx.frageId) : "basis" });
     fb1 = r.feedback ?? null;
     if (fb1) Object.assign(rec, { kategorie: fb1.kategorie, fehlertypen: fb1.fehlertypen, tipp: fb1.tipp, nachfrage: fb1.nachfrage, quelle: "claude" });
     gespeichert = await speichereAntwort(rec);
@@ -123,7 +125,7 @@ export function qaFlow(ctx: QaKontext, onDone: (rec: Antwort | NeueAntwort) => v
     s2.addEventListener("click", async () => {
       const t2 = ta2.value.trim(); if (!t2) { ta2.focus(); return; }
       s2.disabled = skip.disabled = true; ta2.readOnly = true;
-      out2.replaceChildren(el("p", { class: "muted" }, "Der Prüfer liest …"));
+      out2.replaceChildren(el("p", { class: "muted" }, "Der Prüfer liest gründlich … (ca. 10–20 Sekunden)"));
       const f1 = fb1!;
       const r2 = await pruefe({
         modus: ctx.modus, frageId: ctx.modus === "wander" ? ctx.frageId : undefined, begriffId: ctx.begriffId, freiesThema: ctx.freiesThema,
