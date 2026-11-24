@@ -6,6 +6,16 @@
 // - schickt NUR Frage + Antworttext an Anthropic, keine E-Mail, keine Nutzer-ID
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+/** Service-Schlüssel: neues System (SUPABASE_SECRET_KEYS) oder Legacy (SUPABASE_SERVICE_ROLE_KEY) */
+function serviceSchluessel(): string {
+  const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (legacy) return legacy;
+  try {
+    const keys = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}") as Record<string, string>;
+    return keys.default ?? Object.values(keys)[0] ?? "";
+  } catch { return ""; }
+}
+
 const LIMIT_PRO_TAG = 80;
 const MODELL = "claude-haiku-5-5";
 const ERLAUBTE_URSPRUENGE = ["https://t-mathe-trainer.de", "https://www.t-mathe-trainer.de", "http://localhost:5173"];
@@ -94,8 +104,9 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ fehler: "methode" }, 405, origin);
 
   const url = Deno.env.get("SUPABASE_URL")!;
-  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+  const serviceKey = serviceSchluessel();
+  // Secret-Name im Projekt: "math-key" (vom User angelegt); ANTHROPIC_API_KEY als Alternative
+  const apiKey = Deno.env.get("ANTHROPIC_API_KEY") ?? Deno.env.get("math-key");
   if (!apiKey) return json({ fehler: "nicht_konfiguriert" }, 503, origin);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 
