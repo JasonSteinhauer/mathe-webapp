@@ -7,6 +7,10 @@ import { renderWander, renderErklaer } from "./uebung";
 import { renderVerstehen } from "./verstehen";
 import { renderFortschritt } from "./fortschritt";
 import { renderStart, renderKonto, renderAdmin, renderDatenschutz } from "./seiten";
+import { renderDarstellung } from "./darstellung";
+import { wendeAktivAn } from "./themes";
+
+wendeAktivAn(); // gespeicherten Style sofort anwenden (vor dem ersten Zeichnen)
 
 const app = document.getElementById("app")!;
 const nav = document.getElementById("nav")!;
@@ -16,6 +20,7 @@ function zeigeLogin(): void {
   nav.replaceChildren();
   nav.classList.add("hidden");
   if (location.hash === "#datenschutz") { renderDatenschutz(app); return; }
+  if (location.hash === "#darstellung") { renderDarstellung(app); return; }
   const eingabe = el("input", { type: "email", id: "email", required: true, autocomplete: "email", placeholder: "name@beispiel.de" });
   const knopf = el("button", { type: "submit", class: "primary" }, "Login-Code senden");
   const status = el("p", { class: "muted small" });
@@ -78,6 +83,7 @@ const ANSICHTEN: Record<string, { titel: string; render: (v: HTMLElement) => voi
   konto: { titel: "Konto", render: (v) => renderKonto(v, session?.user.email ?? ""), nav: true },
   admin: { titel: "Admin", render: renderAdmin, nav: true, admin: true },
   datenschutz: { titel: "Datenschutz", render: renderDatenschutz },
+  darstellung: { titel: "Darstellung", render: renderDarstellung },
 };
 
 function aktuelleAnsicht(): string {
@@ -94,7 +100,7 @@ function zeichneNav(): void {
 }
 
 async function route(): Promise<void> {
-  if (!session) { zeigeLogin(); return; }
+  if (!session) { if (location.hash !== "#darstellung") wendeAktivAn(); zeigeLogin(); return; }
   if (!zustand.geladen) {
     app.replaceChildren(el("p", { class: "muted" }, "Lade deine Daten …"));
     try { await (ladeVersuch ??= ladeAlles()); }
@@ -106,6 +112,7 @@ async function route(): Promise<void> {
     zeichneNav();
   }
   const v = aktuelleAnsicht();
+  if (v !== "darstellung") wendeAktivAn(); // ungespeicherte Vorschau aus dem Editor verwerfen
   nav.querySelectorAll("a").forEach((a) => a.setAttribute("aria-current", a.dataset.view === v ? "page" : "false"));
   await ANSICHTEN[v].render(app);
 }

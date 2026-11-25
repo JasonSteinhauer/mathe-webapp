@@ -148,7 +148,7 @@ export function renderDatenschutz(view: HTMLElement): void {
       el("li", null, "Meldungen und Feedback, die du selbst abschickst (ohne Namen)."),
       el("li", null, "Ein Tageszähler für die Prüfer-Aufrufe (wird nach spätestens 7 Tagen gelöscht)."),
       el("li", null, "Technisch beim Seitenaufruf: IP-Adresse und Zeitpunkt in den Server-Protokollen der Dienstleister (siehe unten).")),
-    p("Es gibt keine Werbung, kein Tracking und keine Analyse-Tools. Im Browser wird nur die Anmeldung gespeichert (Local Storage), damit du angemeldet bleibst."),
+    p("Es gibt keine Werbung, kein Tracking und keine Analyse-Tools. Im Browser werden nur die Anmeldung (damit du angemeldet bleibst) und deine gewählte Darstellung bzw. eigene Styles gespeichert (Local Storage). Die Styles werden nicht übertragen."),
     h("Wozu?"),
     p("Ausschließlich, um dir den Trainer bereitzustellen: Anmeldung, Speichern deines Lernstands, Bewertung deiner Antworten durch den KI-Prüfer, Bearbeitung deiner Meldungen."),
     h("Wer sieht deine Daten?"),
