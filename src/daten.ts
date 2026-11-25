@@ -5,7 +5,7 @@ export type Frage = { id: string; kapitel: number[]; format: string; text: strin
 export type Begriff = { id: string; begriff: string; kapitel: number };
 export type Kategorie = "richtig" | "teilweise" | "fehler" | "offen";
 export type Antwort = {
-  id: string; ts: number; modus: "wander" | "erklaer"; runde_id: string | null; frage_id: string; kapitel: number[];
+  id: string; ts: number; modus: "wander" | "erklaer" | "gruppe"; runde_id: string | null; frage_id: string; kapitel: number[];
   format: string | null; frage: string; antwort: string; weiss_nicht: boolean; kategorie: Kategorie; fehlertypen: string[];
   tipp: string; nachfrage: string; antwort_nachfrage: string; kategorie_nachfrage: string; fehlertypen_nachfrage: string[];
   tipp_nachfrage: string; zu_viel_verraten: boolean; quelle: "claude" | "offline";
@@ -29,6 +29,7 @@ export const zustand = {
   karten: {} as Record<string, Karte>,
   chats: [] as ChatInfo[],
   istAdmin: false,
+  anzeigename: "" as string,
   geladen: false,
   kiHeute: 0,
 };
@@ -40,7 +41,7 @@ export async function ladeAlles(): Promise<void> {
     c.from("begriffe").select("id, begriff, kapitel").eq("aktiv", true).order("kapitel").order("begriff"),
     c.from("antworten").select("*").order("erstellt_am", { ascending: true }).limit(5000),
     c.from("karten").select("*"),
-    c.from("profile").select("ist_admin").maybeSingle(),
+    c.from("profile").select("ist_admin, anzeigename").maybeSingle(),
     c.rpc("ki_kontingent_heute"),
     c.from("chats").select("id, typ, begriff_id, antwort_id, frage_id, titel, loesung_gezeigt, loesung_am, aktualisiert_am").order("aktualisiert_am", { ascending: false }).limit(1000),
   ]);
@@ -51,6 +52,7 @@ export async function ladeAlles(): Promise<void> {
   zustand.karten = {};
   for (const row of k.data ?? []) zustand.karten[row.karte_id] = zuKarte(row);
   zustand.istAdmin = Boolean(p.data?.ist_admin);
+  zustand.anzeigename = (p.data?.anzeigename as string | null) ?? "";
   zustand.kiHeute = typeof n.data === "number" ? n.data : 0;
   zustand.chats = (ch.data ?? []).map(zuChat);
   zustand.geladen = true;
@@ -201,4 +203,94 @@ export async function loescheKonto(): Promise<boolean> {
   if (error) { console.warn(error); return false; }
   await sb().auth.signOut();
   return true;
+}
+
+/* ---------- Profil: Anzeigename + veröffentlichter Lernstand ---------- */
+export async function setzeAnzeigename(name: string): Promise<boolean> {
+  const n = name.trim().slice(0, 30);
+  if (!n) return false;
+  const { data: u } = await sb().auth.getUser();
+  const { error } = await sb().from("profile").update({ anzeigename: n }).eq("id", u.user?.id ?? "");
+  if (error) { console.warn(error); return false; }
+  zustand.anzeigename = n;
+  return true;
+}
+let letzterLernstand = "";
+/** Lernstand pro Kapitel (Prozent) ins Profil schreiben – sichtbar nur für Mitglieder gemeinsamer Gruppenräume */
+export async function veroeffentlicheLernstand(stand: Record<string, number>): Promise<void> {
+  const j = JSON.stringify(stand);
+  if (j === letzterLernstand) return;
+  letzterLernstand = j;
+  const { data: u } = await sb().auth.getUser();
+  const { error } = await sb().from("profile").update({ lernstand: stand, lernstand_am: new Date().toISOString() }).eq("id", u.user?.id ?? "");
+  if (error) { console.warn(error); letzterLernstand = ""; }
+}
+
+/* ---------- Gruppenräume ---------- */
+export type Raum = { id: string; code: string; runde: number; frage_id: string; phase: "sammeln" | "bewerten" | "nachfragen" | "fertig";
+  antwort: string; antwort_von: string | null; antwort_am: string | null; bewertung: { kategorie: Kategorie; fehlertypen: string[]; tipp: string } | null; aktiv_am: string };
+export type RaumMitglied = { user_id: string; anzeigename: string; lernstand: Record<string, number>; hat_nachfrage: boolean; beantwortet: boolean };
+export type GruppenAntwort = { ok?: boolean; feedback?: Feedback; rest?: number; fehler?: string; limit?: number };
+
+function rpcFehler(e: { message?: string } | null): string { return (e?.message ?? "netz").replace(/^.*?(\w+)$/, "$1"); }
+
+export async function raumErstellen(frageId: string): Promise<{ id?: string; fehler?: string }> {
+  const { data, error } = await sb().rpc("raum_erstellen", { p_frage: frageId });
+  if (error) return { fehler: rpcFehler(error) };
+  return { id: (data as { id: string }[])[0]?.id };
+}
+export async function raumBeitreten(code: string): Promise<{ id?: string; fehler?: string }> {
+  const { data, error } = await sb().rpc("raum_beitreten", { p_code: code });
+  if (error) return { fehler: rpcFehler(error) };
+  return { id: data as string };
+}
+export async function raumVerlassen(id: string): Promise<void> { await sb().rpc("raum_verlassen", { p_raum: id }); }
+export async function raumNaechste(id: string, frageId: string): Promise<string | null> {
+  const { error } = await sb().rpc("raum_naechste", { p_raum: id, p_frage: frageId });
+  return error ? rpcFehler(error) : null;
+}
+export async function ladeRaum(id: string): Promise<Raum | null> {
+  const { data, error } = await sb().from("raeume").select("id, code, runde, frage_id, phase, antwort, antwort_von, antwort_am, bewertung, aktiv_am").eq("id", id).maybeSingle();
+  if (error) console.warn(error);
+  return (data as Raum) ?? null;
+}
+export async function ladeRaumStatus(id: string): Promise<RaumMitglied[]> {
+  const { data, error } = await sb().rpc("raum_status", { p_raum: id });
+  if (error) { console.warn(error); return []; }
+  return Array.isArray(data) ? (data as RaumMitglied[]) : [];
+}
+export async function eigeneNachfrage(id: string, runde: number): Promise<{ nachfrage: string; beantwortet: boolean } | null> {
+  const { data } = await sb().from("raum_nachfragen").select("nachfrage, beantwortet").eq("raum_id", id).eq("runde", runde).maybeSingle();
+  return (data as { nachfrage: string; beantwortet: boolean }) ?? null;
+}
+export async function meineRaeume(): Promise<{ id: string; code: string; aktiv_am: string; frage_id: string }[]> {
+  const { data } = await sb().from("raeume").select("id, code, aktiv_am, frage_id").order("aktiv_am", { ascending: false }).limit(10);
+  return (data ?? []) as { id: string; code: string; aktiv_am: string; frage_id: string }[];
+}
+export async function schreibeGruppenAntwort(id: string, text: string): Promise<boolean> {
+  const { data: u } = await sb().auth.getUser();
+  const { error } = await sb().from("raeume").update({ antwort: text.slice(0, 4000), antwort_von: u.user?.id, antwort_am: new Date().toISOString() }).eq("id", id);
+  if (error) console.warn(error);
+  return !error;
+}
+export async function gruppeKI(body: { aktion: "bewerten" | "nachfrage"; raumId: string; antwort?: string }): Promise<GruppenAntwort> {
+  const { data, error } = await sb().functions.invoke("gruppe", { body });
+  const d = (error ? await fehlerBody(error) : data) as GruppenAntwort;
+  if (typeof d.rest === "number") zustand.kiHeute = LIMIT_PRO_TAG - d.rest;
+  return d;
+}
+
+/* ---------- Admin: anonymes Scoreboard ---------- */
+export type StatZeile = { nutzer: string; antworten: number; richtig_prozent: number | null; antworten_7_tage: number; gruppen_antworten: number;
+  chats: number; ki_7_tage: number; letzte_aktivitaet: string | null; lernstand: Record<string, number> };
+export async function ladeStatistik(): Promise<StatZeile[]> {
+  const { data, error } = await sb().rpc("admin_statistik");
+  if (error) throw error;
+  return Array.isArray(data) ? (data as StatZeile[]) : [];
+}
+
+/** Nach einer Gruppen-Nachfrage die private Antwortzeile (von der Edge Function angelegt) in den Zustand holen */
+export async function holeGruppenAntwort(rundeId: string): Promise<void> {
+  const { data } = await sb().from("antworten").select("*").eq("runde_id", rundeId).limit(1);
+  for (const r of data ?? []) if (!zustand.antworten.some((a) => a.id === r.id)) zustand.antworten.push(zuAntwort(r));
 }

@@ -8,6 +8,10 @@ import { renderVerstehen } from "./verstehen";
 import { renderFortschritt } from "./fortschritt";
 import { renderStart, renderKonto, renderAdmin, renderDatenschutz } from "./seiten";
 import { renderDarstellung } from "./darstellung";
+import { renderGruppe, kanalSchliessen } from "./gruppe";
+import { berechneStand, kapitelSicherheit } from "./lernstand";
+import { veroeffentlicheLernstand } from "./daten";
+import { KAPITEL } from "./ui";
 import { wendeAktivAn } from "./themes";
 
 wendeAktivAn(); // gespeicherten Style sofort anwenden (vor dem ersten Zeichnen)
@@ -79,6 +83,7 @@ const ANSICHTEN: Record<string, { titel: string; render: (v: HTMLElement) => voi
   wander: { titel: "Wanderfragen", render: renderWander, nav: true },
   erklaer: { titel: "Erklär's mir", render: renderErklaer, nav: true },
   verstehen: { titel: "Verstehen", render: renderVerstehen, nav: true },
+  gruppe: { titel: "Gruppe", render: renderGruppe, nav: true },
   fortschritt: { titel: "Fortschritt", render: renderFortschritt, nav: true },
   konto: { titel: "Konto", render: (v) => renderKonto(v, session?.user.email ?? ""), nav: true },
   admin: { titel: "Admin", render: renderAdmin, nav: true, admin: true },
@@ -87,7 +92,7 @@ const ANSICHTEN: Record<string, { titel: string; render: (v: HTMLElement) => voi
 };
 
 function aktuelleAnsicht(): string {
-  const h = location.hash.replace("#", "");
+  const h = location.hash.replace("#", "").split("?")[0];
   const a = ANSICHTEN[h];
   return a && (!a.admin || zustand.istAdmin) ? h : "start";
 }
@@ -113,6 +118,10 @@ async function route(): Promise<void> {
   }
   const v = aktuelleAnsicht();
   if (v !== "darstellung") wendeAktivAn(); // ungespeicherte Vorschau aus dem Editor verwerfen
+  if (v !== "gruppe") kanalSchliessen();
+  // Lernstand pro Kapitel fürs Gruppen-Fenster veröffentlichen (nur bei Änderung)
+  const sicher = kapitelSicherheit(berechneStand());
+  void veroeffentlicheLernstand(Object.fromEntries(KAPITEL.map((k) => [String(k), sicher[k].prozent])));
   nav.querySelectorAll("a").forEach((a) => a.setAttribute("aria-current", a.dataset.view === v ? "page" : "false"));
   await ANSICHTEN[v].render(app);
 }
