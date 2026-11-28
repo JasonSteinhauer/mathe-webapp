@@ -1,6 +1,6 @@
 // „Verstehen“: Verständnis-Chat zu Glossar-Begriffen und zu eigenen Trainer-Aufgaben
 // (ersetzt die bisherigen Selbsttest-Karten; der Leitner-Kasten für Begriffe bleibt im Hintergrund erhalten)
-import { el, toast, kapLabel, fmtDate, shuffle, KAT_LABEL, DAY } from "./ui";
+import { el, toast, kapLabel, kapName, fmtDate, shuffle, KAT_LABEL, DAY } from "./ui";
 import { zustand, verstehe, ladeNachrichten, loescheChat, speichereKarte, LIMIT_PRO_TAG, type Antwort, type Begriff, type ChatNachricht, type Karte } from "./daten";
 import { berechneStand } from "./lernstand";
 
@@ -45,7 +45,7 @@ export function renderVerstehen(view: HTMLElement): void {
   const faellig = begriffe.filter((b) => zustand.karten[b.id] && zustand.karten[b.id].faellig <= now).sort((a, b) => zustand.karten[a.id].stufe - zustand.karten[b.id].stufe);
   const neu = shuffle(begriffe.filter((b) => !zustand.karten[b.id]));
   const vorschlag = faellig.concat(neu).slice(0, 6);
-  const dl = el("datalist", { id: "v-begriffe" }, ...begriffe.map((b) => el("option", { value: b.begriff }, "Kap. " + b.kapitel)));
+  const dl = el("datalist", { id: "v-begriffe" }, ...begriffe.map((b) => el("option", { value: b.begriff }, kapName(b.kapitel))));
   const inp = el("input", { type: "text", id: "v-begriff", list: "v-begriffe", maxlength: 120, placeholder: "Begriff aus dem Glossar, z. B. Äquivalenzrelation", autocomplete: "off" });
   const los = el("button", { type: "button", class: "primary" }, "Begriff verstehen");
   los.addEventListener("click", () => {
@@ -131,7 +131,7 @@ async function renderChat(view: HTMLElement, o: Offen): Promise<void> {
       el("button", { type: "button", class: "small", onclick: () => void bewerteBegriff(begriff, "keine") }, "Noch nicht"))) : null;
 
   view.replaceChildren(
-    el("div", { class: "row between", style: "margin-bottom:10px" }, el("span", { class: "muted small" }, begriff ? "Begriff · Kap. " + begriff.kapitel : "Aufgabe"), zurueck),
+    el("div", { class: "row between", style: "margin-bottom:10px" }, el("span", { class: "muted small" }, begriff ? "Begriff · " + kapName(begriff.kapitel) : "Aufgabe"), zurueck),
     el("section", { class: "card" },
       begriff ? el("p", { class: "term" }, begriff.begriff) : el("p", { class: "question" }, o.titel),
       kontext, verlauf,

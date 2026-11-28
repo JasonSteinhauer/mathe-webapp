@@ -1,5 +1,5 @@
 // Fortschritt: eigene Auswertung (nur die eigenen Daten, per RLS geschützt)
-import { el, kapLabel, fmtDate, dayKey, KAPITEL, KAT_LABEL, FEHLERTYPEN, DAY } from "./ui";
+import { el, kapLabel, kapName, fmtDate, dayKey, KAPITEL, KAT_LABEL, FEHLERTYPEN, DAY } from "./ui";
 import { zustand, LIMIT_PRO_TAG, type Antwort } from "./daten";
 import { berechneStand, kapitelSicherheit } from "./lernstand";
 import { oeffneChatZuAntwort } from "./verstehen";
@@ -44,7 +44,7 @@ export function renderFortschritt(view: HTMLElement): void {
   const a = zustand.antworten.slice().sort((x, y) => x.ts - y.ts);
   const total = a.length;
   const richtig = a.filter((x) => x.kategorie === "richtig").length;
-  const geuebt = new Set(a.filter((x) => x.modus === "wander").map((x) => x.frage_id)).size;
+  const geuebt = new Set(a.filter((x) => x.modus === "wander" && !x.frage_id.startsWith("var-")).map((x) => x.frage_id)).size;
   const woche = a.filter((x) => Date.now() - x.ts < 7 * DAY).length;
   const sec = el("div", { style: "display:flex;flex-direction:column;gap:16px" });
   sec.append(el("div", { class: "tiles" },
@@ -64,8 +64,8 @@ export function renderFortschritt(view: HTMLElement): void {
   const lernBars = el("div", { class: "bars" });
   for (const v of KAPITEL) {
     const k = sicher[v];
-    lernBars.append(el("div", { class: "bar" }, el("span", { class: "lbl" }, "Kap. " + v),
-      el("div", { class: "stack", role: "img", "aria-label": "Kapitel " + v + ": " + k.prozent + " Prozent sicher" }, el("i", { class: "s-richtig", style: "width:" + k.prozent + "%" })),
+    lernBars.append(el("div", { class: "bar" }, el("span", { class: "lbl" }, kapName(v)),
+      el("div", { class: "stack", role: "img", "aria-label": kapName(v) + ": " + k.prozent + " Prozent sicher" }, el("i", { class: "s-richtig", style: "width:" + k.prozent + "%" })),
       el("span", { class: "num" }, k.prozent + " %")));
   }
   const offenAnzahl = Object.values(stand).filter((x) => x.faellig <= Date.now()).length;
@@ -75,7 +75,7 @@ export function renderFortschritt(view: HTMLElement): void {
   for (const v of KAPITEL) {
     const c: Record<string, number> = {}; let t = 0;
     for (const x of a) if (x.kapitel.includes(v)) { c[x.kategorie] = (c[x.kategorie] || 0) + 1; t++; }
-    perKap.append(stackBar("Kap. " + v, c, t));
+    perKap.append(stackBar(kapName(v), c, t));
   }
   sec.append(el("section", { class: "card" }, el("h2", null, "Pro Kapitel"), legend(), perKap,
     el("p", { class: "muted small", style: "margin:0" }, "Bewertung der ersten Antwort. Verknüpfungsfragen zählen bei jedem beteiligten Kapitel.")));

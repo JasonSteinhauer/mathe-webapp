@@ -1,5 +1,5 @@
 // Startseite, Konto, Admin-Ansicht, Datenschutz
-import { el, toast, fmtDate, KAPITEL } from "./ui";
+import { el, toast, fmtDate, KAPITEL, kapName } from "./ui";
 import { zustand, sendeFeedback, exportiereEigeneDaten, loescheKonto, ladeAdmin, setzeStatus, setzeAnzeigename, ladeStatistik, LIMIT_PRO_TAG, type Meldung, type FeedbackEintrag, type StatZeile } from "./daten";
 import { supabase } from "./supabase";
 import { VERANTWORTLICH_NAME, VERANTWORTLICH_KONTAKT, STAND_DATENSCHUTZ } from "./config";
@@ -11,7 +11,7 @@ export function renderStart(view: HTMLElement): void {
   view.replaceChildren(
     el("section", { class: "card" },
       el("h2", null, "Willkommen beim Mathe-Trainer"),
-      el("p", { style: "margin:0" }, "Übe die Inhalte von Mathe 1 (Kapitel 1–7) so, wie es in der mündlichen Prüfung gefragt wird: in eigenen Worten."),
+      el("p", { style: "margin:0" }, "Übe die Inhalte von Mathe 1 (Kapitel 1–7, EL 1 und EL 2) so, wie es in der mündlichen Prüfung gefragt wird: in eigenen Worten."),
       el("div", { class: "tiles" },
         el("a", { class: "tile", href: "#wander" }, el("b", null, zustand.fragen.length), el("span", null, "Wanderfragen")),
         el("a", { class: "tile", href: "#erklaer" }, el("b", null, zustand.begriffe.length), el("span", null, "Begriffe erklären")),
@@ -22,7 +22,7 @@ export function renderStart(view: HTMLElement): void {
       el("h2", null, "Gut zu wissen"),
       el("ul", { style: "margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px" },
         el("li", null, "Der Prüfer gibt ", el("b", null, "keine Lösungen"), ", nur Tipps und eine Nachfrage. Unter „Verstehen“ erklärt dir ein Lern-Chat das Thema; einen Lösungsweg gibt es dort erst, wenn du danach fragst und vorher zweimal selbst probiert hast."),
-        el("li", null, "Der Trainer passt sich dir an: Was noch nicht sitzt, kommt öfter wieder; sichere Themen seltener, dafür anspruchsvoller."),
+        el("li", null, "Der Trainer passt sich dir an: Was noch nicht sitzt, kommt öfter wieder. Was du sicher kannst, kommt nur noch selten – stattdessen bekommst du dazu ab und zu eine neue, schwierigere Frage, die die KI nur für dich erzeugt."),
         el("li", null, "Das Feedback kommt von einer ", el("b", null, "KI"), " und kann Fehler enthalten. Prüfe Unsicheres mit deinen Unterlagen."),
         el("li", null, `Pro Tag hast du ${LIMIT_PRO_TAG} KI-Aufrufe für Prüfer, Lern-Chat und Gruppe zusammen (eine Antwort plus Nachfrage sind zwei).`),
         el("li", null, "Im Gruppenmodus beantwortet ihr eine Aufgabe gemeinsam, danach bekommt jede Person eine eigene Nachfrage – wie in der Gruppenprüfung."),
@@ -156,12 +156,12 @@ export async function renderAdmin(view: HTMLElement): Promise<void> {
     const summe = (k: keyof StatZeile) => statistik.reduce((t, s) => t + (Number(s[k]) || 0), 0);
     const kopf = el("tr", null, ...sp.map(([k, t]) => el("th", null, el("button", { type: "button", class: "th-btn", "aria-sort": sortKey === k ? (sortAuf ? "ascending" : "descending") : "none",
       onclick: () => { if (sortKey === k) sortAuf = !sortAuf; else { sortKey = k; sortAuf = k === "nutzer"; } zeichne(); } }, t + (sortKey === k ? (sortAuf ? " ▲" : " ▼") : "")))),
-      el("th", null, "Lernstand Kap. 1–7"));
+      el("th", null, "Lernstand Kap. 1–7, EL 1–2"));
     const tab = el("table", { class: "stats" }, el("thead", null, kopf), el("tbody", null, ...zeilen.map((s) => el("tr", null,
       el("td", null, s.nutzer), el("td", null, s.antworten), el("td", null, s.richtig_prozent ?? "–"), el("td", null, s.antworten_7_tage),
       el("td", null, s.gruppen_antworten), el("td", null, s.chats), el("td", null, s.ki_7_tage),
       el("td", null, s.letzte_aktivitaet ? new Date(s.letzte_aktivitaet).toLocaleDateString("de-DE") : "–"),
-      el("td", null, el("span", { class: "mini-ls" }, ...KAPITEL.map((k) => { const p = Number(s.lernstand?.[k] ?? 0); return el("i", { style: `--p:${p}`, title: "Kap. " + k + ": " + p + " %" }); })))))));
+      el("td", null, el("span", { class: "mini-ls" }, ...KAPITEL.map((k) => { const p = Number(s.lernstand?.[k] ?? 0); return el("i", { style: `--p:${p}`, title: kapName(k) + ": " + p + " %" }); })))))));
     return el("section", { class: "card" }, el("h2", null, "Überblick (anonym)"),
       el("div", { class: "tiles" },
         el("div", { class: "tile" }, el("b", null, statistik.length), el("span", null, "Konten")),
@@ -190,6 +190,7 @@ export function renderDatenschutz(view: HTMLElement): void {
       el("li", null, "Deine E-Mail-Adresse (für Einladung und Anmeldung)."),
       el("li", null, "Deine Übungsdaten: Antworten, Bewertungen des Prüfers, Einschätzungen zu Begriffen."),
       el("li", null, "Deine Verständnis-Chats (Nachrichten an den Lern-Chat und dessen Antworten), bis du sie oder dein Konto löschst."),
+      el("li", null, "Neue Übungsfragen, die die KI nur für dich erzeugt hat (zu Fragen, die du sicher beherrschst)."),
       el("li", null, "Wenn du den Gruppenmodus nutzt: dein selbst gewählter Anzeigename, deine Gruppenräume mit der gemeinsamen Antwort (werden 7 Tage nach der letzten Aktivität gelöscht) und dein Lernstand in Prozent pro Kapitel."),
       el("li", null, "Meldungen und Feedback, die du selbst abschickst (ohne Namen)."),
       el("li", null, "Ein Tageszähler für die Prüfer-Aufrufe (wird nach spätestens 7 Tagen gelöscht)."),

@@ -1,7 +1,7 @@
 // Datenzugriff: Supabase-Tabellen (geschützt durch RLS) und Edge Functions
 import { supabase } from "./supabase";
 
-export type Frage = { id: string; kapitel: number[]; format: string; text: string; fallen: string[] };
+export type Frage = { id: string; kapitel: number[]; format: string; text: string; fallen: string[]; basis_frage_id?: string; erstellt_am?: string };
 export type Begriff = { id: string; begriff: string; kapitel: number };
 export type Kategorie = "richtig" | "teilweise" | "fehler" | "offen";
 export type Antwort = {
@@ -28,6 +28,7 @@ export const zustand = {
   antworten: [] as Antwort[],
   karten: {} as Record<string, Karte>,
   chats: [] as ChatInfo[],
+  varianten: [] as Frage[],   // KI-Fragevarianten nur für diese Person (id „var-…“)
   istAdmin: false,
   anzeigename: "" as string,
   geladen: false,
@@ -36,7 +37,7 @@ export const zustand = {
 
 export async function ladeAlles(): Promise<void> {
   const c = sb();
-  const [f, b, a, k, p, n, ch] = await Promise.all([
+  const [f, b, a, k, p, n, ch, va] = await Promise.all([
     c.from("fragen").select("id, kapitel, format, text, fallen").eq("aktiv", true).order("id"),
     c.from("begriffe").select("id, begriff, kapitel").eq("aktiv", true).order("kapitel").order("begriff"),
     c.from("antworten").select("*").order("erstellt_am", { ascending: true }).limit(5000),
@@ -44,6 +45,7 @@ export async function ladeAlles(): Promise<void> {
     c.from("profile").select("ist_admin, anzeigename").maybeSingle(),
     c.rpc("ki_kontingent_heute"),
     c.from("chats").select("id, typ, begriff_id, antwort_id, frage_id, titel, loesung_gezeigt, loesung_am, aktualisiert_am").order("aktualisiert_am", { ascending: false }).limit(1000),
+    c.from("fragen_varianten").select("id, kapitel, format, text, fallen, basis_frage_id, erstellt_am").order("erstellt_am").limit(1000),
   ]);
   for (const r of [f, b, a, k]) if (r.error) throw r.error;
   zustand.fragen = f.data as Frage[];
@@ -55,6 +57,7 @@ export async function ladeAlles(): Promise<void> {
   zustand.anzeigename = (p.data?.anzeigename as string | null) ?? "";
   zustand.kiHeute = typeof n.data === "number" ? n.data : 0;
   zustand.chats = (ch.data ?? []).map(zuChat);
+  zustand.varianten = Array.isArray(va.data) ? (va.data as Frage[]) : []; // Tabelle fehlt noch → leer, kein Fehler
   zustand.geladen = true;
 }
 
@@ -190,11 +193,12 @@ export async function exportiereEigeneDaten(): Promise<Blob> {
     c.from("meldungen").select("*"), c.from("feedback").select("*"),
     c.from("chats").select("*"), c.from("chat_nachrichten").select("chat_id, rolle, text, erstellt_am").order("id"), c.auth.getUser(),
   ]);
+  const va = await c.from("fragen_varianten").select("*");
   const daten = {
     exportiert_am: new Date().toISOString(),
     email: u.data.user?.email ?? null,
     antworten: a.data ?? [], karten: k.data ?? [], meldungen: m.data ?? [], feedback: f.data ?? [],
-    chats: ch.data ?? [], chat_nachrichten: cn.data ?? [],
+    chats: ch.data ?? [], chat_nachrichten: cn.data ?? [], fragen_varianten: va.data ?? [],
   };
   return new Blob([JSON.stringify(daten, null, 2)], { type: "application/json" });
 }
@@ -293,4 +297,13 @@ export async function ladeStatistik(): Promise<StatZeile[]> {
 export async function holeGruppenAntwort(rundeId: string): Promise<void> {
   const { data } = await sb().from("antworten").select("*").eq("runde_id", rundeId).limit(1);
   for (const r of data ?? []) if (!zustand.antworten.some((a) => a.id === r.id)) zustand.antworten.push(zuAntwort(r));
+}
+
+/* ---------- KI-Fragevarianten (Edge Function „variante“) ---------- */
+export async function erzeugeVariante(basisFrageId: string): Promise<{ frage?: Frage; fehler?: string }> {
+  const { data, error } = await sb().functions.invoke("variante", { body: { basisFrageId } });
+  const d = (error ? await fehlerBody(error) : data) as { frage?: Frage; rest?: number; fehler?: string };
+  if (typeof d.rest === "number") zustand.kiHeute = LIMIT_PRO_TAG - d.rest;
+  if (d.frage) zustand.varianten.push(d.frage);
+  return d;
 }

@@ -3,7 +3,7 @@
 // Lernstand pro Kapitel. Nicht sichtbar: Einzelnachfragen, Einzelantworten, Einzelbewertungen.
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
-import { el, toast, kapLabel, KAPITEL, KAT_LABEL, FEHLERTYPEN, FORMATE } from "./ui";
+import { el, toast, kapLabel, kapName, kapKurz, KAPITEL, KAT_LABEL, FEHLERTYPEN, FORMATE } from "./ui";
 import {
   zustand, LIMIT_PRO_TAG, setzeAnzeigename, raumErstellen, raumBeitreten, raumVerlassen, raumNaechste, ladeRaum, ladeRaumStatus,
   eigeneNachfrage, meineRaeume, schreibeGruppenAntwort, gruppeKI, holeGruppenAntwort, type RaumMitglied, type Frage,
@@ -52,7 +52,7 @@ export async function renderGruppe(view: HTMLElement): Promise<void> {
   }
 
   // 2) Raum erstellen
-  const kapWahl = el("div", { class: "vlpick" }, ...KAPITEL.map((k) => el("label", null, el("input", { type: "checkbox", value: String(k) }), "Kap. " + k)));
+  const kapWahl = el("div", { class: "vlpick" }, ...KAPITEL.map((k) => el("label", null, el("input", { type: "checkbox", value: String(k) }), kapName(k))));
   const erstellen = el("button", { type: "button", class: "primary" }, "Raum erstellen");
   erstellen.addEventListener("click", async () => {
     const kap = [...kapWahl.querySelectorAll<HTMLInputElement>("input:checked")].map((i) => Number(i.value));
@@ -150,7 +150,7 @@ async function zeigeRaum(view: HTMLElement, id: string): Promise<void> {
 
   function zeichneLernstand(): void {
     const tab = el("table", { class: "lstab" },
-      el("thead", null, el("tr", null, el("th", null, ""), ...KAPITEL.map((k) => el("th", null, "K" + k)))),
+      el("thead", null, el("tr", null, el("th", null, ""), ...KAPITEL.map((k) => el("th", null, kapKurz(k))))),
       el("tbody", null, ...mitglieder.map((m) => el("tr", null, el("th", null, m.anzeigename),
         ...KAPITEL.map((k) => { const p = Number(m.lernstand?.[k] ?? 0); return el("td", { style: `--p:${p}`, title: p + " %" }, p ? String(p) : "–"); })))));
     lernstand.replaceChildren(el("h2", null, "Lernstand der Gruppe"),

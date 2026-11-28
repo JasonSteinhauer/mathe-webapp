@@ -26,7 +26,10 @@ export const FORMATE: Record<string, string> = {
 };
 
 export const KAT_LABEL: Record<string, string> = { richtig: "richtig", teilweise: "teilweise", fehler: "Fehler", offen: "offen" };
-export const KAPITEL = [1, 2, 3, 4, 5, 6, 7];
+export const KAPITEL = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+/** Anzeigename: Kapitel 1–7 aus den Vorlesungen, 8 = EL 1, 9 = EL 2 */
+export const kapName = (k: number) => (k === 8 ? "EL 1" : k === 9 ? "EL 2" : "Kap. " + k);
+export const kapKurz = (k: number) => (k === 8 ? "EL1" : k === 9 ? "EL2" : "K" + k);
 export const DAY = 86400000;
 
 type Kind = Node | string | number | null | undefined | false;
@@ -56,7 +59,7 @@ export function toast(msg: string): void {
   setTimeout(() => t.remove(), 3800);
 }
 
-export const kapLabel = (k: number[]) => k.map((v) => "Kap. " + v).join(" + ");
+export const kapLabel = (k: number[]) => k.map(kapName).join(" + ");
 
 export function fmtDate(ts: number): string {
   const d = new Date(ts);

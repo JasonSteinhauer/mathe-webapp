@@ -46,7 +46,7 @@ function zeigeLogin(): void {
   });
   app.replaceChildren(form, el("section", { class: "card" },
     el("h2", null, "Was ist das?"),
-    el("p", { style: "margin:0" }, "Ein Übungstrainer für Mathe 1 (Kapitel 1–7): Fragen in eigenen Worten beantworten, Tipps von einem KI-Prüfer bekommen, Begriffe mit Lernkarten wiederholen. Ohne fertige Lösungen.")));
+    el("p", { style: "margin:0" }, "Ein Übungstrainer für Mathe 1 (Kapitel 1–7, EL 1 und EL 2): Fragen in eigenen Worten beantworten, Tipps von einem KI-Prüfer bekommen, Begriffe mit Lernkarten wiederholen. Ohne fertige Lösungen.")));
 }
 
 function zeigeCodeEingabe(email: string): void {
